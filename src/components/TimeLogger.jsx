@@ -1,18 +1,19 @@
 import React, { useMemo, useRef, useState, useEffect } from 'react'
 import { useElectronStore } from '../hooks/useElectronStore'
 import { defaultCategories } from '../data/defaultCategories'
-import { 
-  nowISO, 
-  toLocalHM, 
-  startOfDay, 
-  endOfDay, 
-  startOfWeekMonday, 
-  endOfWeekMonday, 
-  startOfMonth, 
-  endOfMonth, 
-  fuzzyScore, 
-  humanHM 
+import {
+  nowISO,
+  toLocalHM,
+  startOfDay,
+  endOfDay,
+  startOfWeekMonday,
+  endOfWeekMonday,
+  startOfMonth,
+  endOfMonth,
+  fuzzyScore,
+  humanHM
 } from '../utils/helpers'
+import { FUZZY_SCORE, UI_TIMING, DISPLAY_LIMITS } from '../utils/constants'
 
 export default function TimeLogger() {
   const [tab, setTab] = useState('log') // 'log' | 'categories'
@@ -47,7 +48,7 @@ export default function TimeLogger() {
     return scored
       .filter(s => s.score > 0)
       .sort((a, b) => b.score - a.score)
-      .slice(0, 8)
+      .slice(0, DISPLAY_LIMITS.DROPDOWN_MAX_ITEMS)
       .map(s => s.c)
   }, [text, categories])
 
@@ -62,15 +63,15 @@ export default function TimeLogger() {
     }))
     candidates.sort((a, b) => b.score - a.score)
     const top = candidates[0]
-    if (top && top.score >= 60) return top.c
+    if (top && top.score >= FUZZY_SCORE.MINIMUM_MATCH_THRESHOLD) return top.c
     
     const ticket = freeText.trim()
-    const newCat = { 
-      id: `cat-${Date.now()}`, 
-      ticket, 
-      description: 'Ad-hoc', 
-      label: `${ticket}`, 
-      nonWork: false 
+    const newCat = {
+      id: crypto.randomUUID(),
+      ticket,
+      description: 'Ad-hoc',
+      label: `${ticket}`,
+      nonWork: false
     }
     setCategories(prev => [...prev, newCat])
     return newCat
@@ -82,12 +83,12 @@ export default function TimeLogger() {
     const entryDateTime = new Date(entryDate)
     entryDateTime.setHours(hours, minutes, 0, 0)
     
-    const entry = { 
-      id: `e-${Date.now()}`, 
-      tsISO: entryDateTime.toISOString(), 
+    const entry = {
+      id: crypto.randomUUID(),
+      tsISO: entryDateTime.toISOString(),
       rawText: cat.ticket, // Store the final selected ticket, not the typed text
-      categoryId: cat.id, 
-      label: cat.label 
+      categoryId: cat.id,
+      label: cat.label
     }
     const next = [...entries, entry].sort((a, b) => new Date(a.tsISO) - new Date(b.tsISO))
     setEntries(next)
@@ -165,7 +166,7 @@ export default function TimeLogger() {
     if (!newCategory.ticket.trim()) return
     
     const cat = {
-      id: `cat-${Date.now()}`,
+      id: crypto.randomUUID(),
       ticket: newCategory.ticket.trim(),
       description: newCategory.description.trim() || 'Custom category',
       label: `${newCategory.ticket.trim()} — ${newCategory.description.trim() || 'Custom category'}`,
@@ -321,7 +322,8 @@ export default function TimeLogger() {
                     value={toLocalHM(tsISO)}
                     onChange={(e) => {
                       const [h, m] = e.target.value.split(':').map(Number)
-                      const d = new Date()
+                      // Use the selected date, not today's date
+                      const d = new Date(entryDate)
                       d.setHours(h, m, 0, 0)
                       setTsISO(d.toISOString())
                     }}
@@ -337,7 +339,7 @@ export default function TimeLogger() {
                         setShowDropdown(e.target.value.trim().length > 0)
                       }}
                       onFocus={() => setShowDropdown(text.trim().length > 0)}
-                      onBlur={() => setTimeout(() => setShowDropdown(false), 120)}
+                      onBlur={() => setTimeout(() => setShowDropdown(false), UI_TIMING.DROPDOWN_BLUR_DELAY)}
                       className="w-full px-4 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-100 placeholder-neutral-400"
                     />
                     {showDropdown && filteredCats.length > 0 && (

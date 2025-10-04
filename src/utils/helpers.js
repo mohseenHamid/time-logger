@@ -1,4 +1,5 @@
 // Time Log utility functions
+import { FUZZY_SCORE } from './constants'
 
 export function nowISO() {
   return new Date().toISOString()
@@ -66,15 +67,24 @@ export function fuzzyScore(input, target) {
   if (!input || !target) return 0
   const a = input.toLowerCase().trim()
   const b = target.toLowerCase().trim()
-  if (a === b) return 100
-  let score = b.includes(a) ? Math.min(80, Math.floor((a.length / b.length) * 80 + 10)) : 0
+  if (a === b) return FUZZY_SCORE.EXACT_MATCH
+
+  let score = b.includes(a)
+    ? Math.min(
+        FUZZY_SCORE.SUBSTRING_MATCH_BASE,
+        Math.floor((a.length / b.length) * FUZZY_SCORE.SUBSTRING_MATCH_BASE + FUZZY_SCORE.SUBSTRING_BONUS)
+      )
+    : 0
+
   const at = new Set(a.split(/[^a-z0-9]+/g).filter(Boolean))
   const bt = new Set(b.split(/[^a-z0-9]+/g).filter(Boolean))
   let overlap = 0
   for (const t of at) if (bt.has(t)) overlap++
-  score += overlap * 7
-  if (b.startsWith(a)) score += 10
-  return Math.min(score, 100)
+
+  score += overlap * FUZZY_SCORE.TOKEN_OVERLAP_MULTIPLIER
+  if (b.startsWith(a)) score += FUZZY_SCORE.PREFIX_MATCH_BONUS
+
+  return Math.min(score, FUZZY_SCORE.EXACT_MATCH)
 }
 
 export function humanHM(totalMinutes) {

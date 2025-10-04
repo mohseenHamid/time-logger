@@ -11,18 +11,19 @@ export function useElectronStore(key, defaultValue) {
   // Load initial value
   useEffect(() => {
     const loadValue = async () => {
-      if (window.electronAPI) {
-        const storedValue = await window.electronAPI.storeGet(key)
-        setValue(storedValue !== undefined ? storedValue : defaultValue)
-        setIsLoaded(true)
-      } else {
-        // Fallback to localStorage for web preview
-        try {
+      try {
+        if (window.electronAPI) {
+          const storedValue = await window.electronAPI.storeGet(key)
+          setValue(storedValue !== undefined ? storedValue : defaultValue)
+        } else {
+          // Fallback to localStorage for web preview
           const item = localStorage.getItem(key)
           setValue(item ? JSON.parse(item) : defaultValue)
-        } catch {
-          setValue(defaultValue)
         }
+      } catch (error) {
+        console.error(`Failed to load value for key "${key}":`, error)
+        setValue(defaultValue)
+      } finally {
         setIsLoaded(true)
       }
     }
@@ -40,19 +41,27 @@ export function useElectronStore(key, defaultValue) {
     }
   }, [key])
 
-  // Update function
+  // Update function - use setValue's functional update to avoid stale closure
   const updateValue = useCallback(async (newValue) => {
-    const valueToStore = typeof newValue === 'function' ? newValue(value) : newValue
-    
-    if (window.electronAPI) {
-      await window.electronAPI.storeSet(key, valueToStore)
-    } else {
-      // Fallback to localStorage
-      localStorage.setItem(key, JSON.stringify(valueToStore))
-    }
-    
-    setValue(valueToStore)
-  }, [key, value])
+    // Use setValue's callback form to get the latest value
+    setValue(currentValue => {
+      const valueToStore = typeof newValue === 'function' ? newValue(currentValue) : newValue
+
+      // Perform async update without blocking state update
+      if (window.electronAPI) {
+        window.electronAPI.storeSet(key, valueToStore)
+      } else {
+        // Fallback to localStorage
+        try {
+          localStorage.setItem(key, JSON.stringify(valueToStore))
+        } catch (error) {
+          console.error('Failed to save to localStorage:', error)
+        }
+      }
+
+      return valueToStore
+    })
+  }, [key])
 
   return [value, updateValue, isLoaded]
 }

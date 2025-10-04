@@ -94,8 +94,15 @@ function showQuickEntry() {
 }
 
 function createTray() {
-  // Create a simple icon for the tray (you can replace with actual icon file)
-  const icon = nativeImage.createEmpty()
+  // Create a simple colored icon for the tray
+  // For production, replace with: nativeImage.createFromPath(path.join(__dirname, 'icon.png'))
+  const canvas = {
+    width: 16,
+    height: 16
+  }
+  const icon = nativeImage.createFromDataURL(
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAAAdgAAAHYBTnsmCAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAAEMSURBVDiNpdM9S8NAGAfwX5pU0RZBcBAHF0EQdHJxcXVwcXFxcXBxEQQHQRAEB0EQHFxcXFwEQXBxEQRBcHBxEQRBcHBxEQRB+gLaJk0u3nNJ0zSCPXC5+/Hc8dwdwD9FVdVTAOcArgHcAbgF4ABAEYATAAUADgAHgA3AAWADcADYABwANgAHgA3AAWADcADYABwANgAHgA3AAWADcADYAPZlGKYJoA6gCqACoAygBKAIoACgDyAPIA8gByALIAMgDSAFIAkgASAOIAYgCiACIAwgBCAIwA/AB8ALwAPADcAFwAnAAcAOwAbAAGAFYACwANAB6ABoADQAKgAVgApAAaAAkAHIAGQAEgAxgBiACEAYQAhAEEAAgB+AD4APgBeAB4AbgAuAE8AfBOWa5H5J/REAAAAASUVORK5CYII='
+  )
   tray = new Tray(icon)
   
   const contextMenu = Menu.buildFromTemplate([

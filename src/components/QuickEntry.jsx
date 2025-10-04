@@ -2,9 +2,10 @@ import React, { useState, useRef, useEffect, useMemo } from 'react'
 import { useElectronStore } from '../hooks/useElectronStore'
 import { defaultCategories } from '../data/defaultCategories'
 import { nowISO, toLocalHM, fuzzyScore } from '../utils/helpers'
+import { FUZZY_SCORE, UI_TIMING, DISPLAY_LIMITS } from '../utils/constants'
 
 export default function QuickEntry() {
-  const [categories] = useElectronStore('timelog.categories.v1', defaultCategories())
+  const [categories, setCategories] = useElectronStore('timelog.categories.v1', defaultCategories())
   const [entries, setEntries] = useElectronStore('timelog.entries.v2', [])
   
   const [text, setText] = useState('')
@@ -13,22 +14,23 @@ export default function QuickEntry() {
   const [showDropdown, setShowDropdown] = useState(false)
   const inputRef = useRef(null)
 
-  // Focus input when window appears
+  // Auto-focus on mount and when window appears
   useEffect(() => {
+    // Initial focus on mount
+    const focusTimer = setTimeout(() => {
+      inputRef.current?.focus()
+    }, UI_TIMING.AUTO_FOCUS_DELAY)
+
+    // Listen for focus requests from main process
     if (window.electronAPI) {
       window.electronAPI.onFocusInput(() => {
         setTimeout(() => {
           inputRef.current?.focus()
-        }, 100)
+        }, UI_TIMING.AUTO_FOCUS_DELAY)
       })
     }
-  }, [])
 
-  // Auto-focus on mount
-  useEffect(() => {
-    setTimeout(() => {
-      inputRef.current?.focus()
-    }, 100)
+    return () => clearTimeout(focusTimer)
   }, [])
 
   // Filter categories for dropdown once user has typed >= 1 char
@@ -46,34 +48,36 @@ export default function QuickEntry() {
     return scored
       .filter(s => s.score > 0)
       .sort((a, b) => b.score - a.score)
-      .slice(0, 5)
+      .slice(0, DISPLAY_LIMITS.QUICK_ENTRY_MAX_ITEMS)
       .map(s => s.c)
   }, [text, categories])
 
   function pickCategoryForFreeText(freeText) {
-    const candidates = categories.map(c => ({ 
-      c, 
+    const candidates = categories.map(c => ({
+      c,
       score: Math.max(
-        fuzzyScore(freeText, c.label), 
-        fuzzyScore(freeText, c.ticket), 
+        fuzzyScore(freeText, c.label),
+        fuzzyScore(freeText, c.ticket),
         fuzzyScore(freeText, c.description)
-      ) 
+      )
     }))
     candidates.sort((a, b) => b.score - a.score)
     const top = candidates[0]
-    if (top && top.score >= 60) return top.c
-    
-    // Create new category
+    if (top && top.score >= FUZZY_SCORE.MINIMUM_MATCH_THRESHOLD) return top.c
+
+    // Create new category and save it to the store
     const ticket = freeText.trim()
-    const newCat = { 
-      id: `cat-${Date.now()}`, 
-      ticket, 
-      description: 'Ad-hoc', 
-      label: `${ticket}`, 
-      nonWork: false 
+    const newCat = {
+      id: crypto.randomUUID(),
+      ticket,
+      description: 'Ad-hoc',
+      label: `${ticket}`,
+      nonWork: false
     }
-    // Note: We don't update categories here in quick entry to keep it fast
-    // The main app will handle new category creation
+
+    // Save to categories store so it's available in main app
+    setCategories(prev => [...prev, newCat])
+
     return newCat
   }
 
@@ -83,12 +87,12 @@ export default function QuickEntry() {
     const entryDateTime = new Date(entryDate)
     entryDateTime.setHours(hours, minutes, 0, 0)
     
-    const entry = { 
-      id: `e-${Date.now()}`, 
-      tsISO: entryDateTime.toISOString(), 
+    const entry = {
+      id: crypto.randomUUID(),
+      tsISO: entryDateTime.toISOString(),
       rawText: cat.ticket, // Store the final selected ticket, not the typed text
-      categoryId: cat.id, 
-      label: cat.label 
+      categoryId: cat.id,
+      label: cat.label
     }
     const next = [...entries, entry].sort((a, b) => new Date(a.tsISO) - new Date(b.tsISO))
     setEntries(next)
@@ -140,7 +144,8 @@ export default function QuickEntry() {
             value={toLocalHM(tsISO)}
             onChange={(e) => {
               const [h, m] = e.target.value.split(':').map(Number)
-              const d = new Date()
+              // Use the selected date, not today's date
+              const d = new Date(entryDate)
               d.setHours(h, m, 0, 0)
               setTsISO(d.toISOString())
             }}
@@ -156,7 +161,7 @@ export default function QuickEntry() {
                 setShowDropdown(e.target.value.trim().length > 0)
               }}
               onFocus={() => setShowDropdown(text.trim().length > 0)}
-              onBlur={() => setTimeout(() => setShowDropdown(false), 150)}
+              onBlur={() => setTimeout(() => setShowDropdown(false), UI_TIMING.QUICK_ENTRY_BLUR_DELAY)}
               onKeyDown={onEscape}
               className="w-full px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-100 placeholder-neutral-400"
             />

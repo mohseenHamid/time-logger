@@ -8,8 +8,10 @@ node_modules/
 
 # Production
 /dist
+/dist-electron
 /build
 /out
+/release
 
 # Logs
 npm-debug.log*

@@ -48,7 +48,10 @@
       "dist-electron/**/*"
     ],
     "win": {
-      "target": ["nsis", "portable"]
+      "target": "portable"
+    },
+    "nsis": {
+      "oneClick": false
     },
     "mac": {
       "target": ["dmg"]
